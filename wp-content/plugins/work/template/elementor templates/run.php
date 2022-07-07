@@ -7,8 +7,8 @@ function importTemplateFromFile( $filepath = null ) {
     $file_content = file_get_contents($path);
     $file_content = json_decode($file_content);
     $getTemplate = get_page_by_title($file_content->title, OBJECT, 'elementor_library');
-
-    if ($getTemplate) {
+    $getTemplateByID = isset($file_content->id) ? get_post($file_content->id) : null;
+    if ($getTemplate || $getTemplateByID) {
       $fileContentArr = [];
       foreach($file_content as $key => $value) {
         if ($key == 'content')
@@ -17,7 +17,15 @@ function importTemplateFromFile( $filepath = null ) {
           $fileContentArr[$key] = $value;
       }
       $fileContentArr['source'] = 'local';
-      $fileContentArr['id'] = $getTemplate->ID;
+      $fileContentArr['id'] = $getTemplateByID ? $getTemplateByID->ID : $getTemplate->ID;
+
+      $post_update = array(
+        'ID'         => $fileContentArr['id'],
+        'post_title' => $fileContentArr['title']
+      );
+
+      if ($getTemplateByID) wp_update_post( $post_update );
+
       \Elementor\Plugin::$instance->templates_manager->update_template($fileContentArr);
     } else {
       \Elementor\Plugin::$instance->templates_manager->import_template([
