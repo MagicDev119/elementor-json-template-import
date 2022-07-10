@@ -1,14 +1,15 @@
 <?php
-
 function importTemplateFromFile( $filepath = null ) {  
+    global $wpdb;
     $path = $filepath;
     $name = basename($path);
     $registered_sources = \Elementor\Plugin::$instance->templates_manager->get_registered_sources();
     $file_content = file_get_contents($path);
     $file_content = json_decode($file_content);
-    $getTemplate = get_page_by_title($file_content->title, OBJECT, 'elementor_library');
-    $getTemplateByID = isset($file_content->id) ? get_post($file_content->id) : null;
-    if ($getTemplate || $getTemplateByID) {
+    $templateId = explode("-", $name);
+    $templateId = $templateId[1];
+    $getTemplateByID = isset($templateId) ? get_post($templateId) : null;
+    if ($getTemplateByID) {
       $fileContentArr = [];
       foreach($file_content as $key => $value) {
         if ($key == 'content')
@@ -17,21 +18,24 @@ function importTemplateFromFile( $filepath = null ) {
           $fileContentArr[$key] = $value;
       }
       $fileContentArr['source'] = 'local';
-      $fileContentArr['id'] = $getTemplateByID ? $getTemplateByID->ID : $getTemplate->ID;
+      $fileContentArr['id'] = $getTemplateByID->ID;
 
       $post_update = array(
         'ID'         => $fileContentArr['id'],
         'post_title' => $fileContentArr['title']
       );
 
-      if ($getTemplateByID) wp_update_post( $post_update );
+      wp_update_post( $post_update );
 
       \Elementor\Plugin::$instance->templates_manager->update_template($fileContentArr);
     } else {
-      \Elementor\Plugin::$instance->templates_manager->import_template([
+      $template = \Elementor\Plugin::$instance->templates_manager->import_template([
         'fileData' => base64_encode(file_get_contents($path)),
         'fileName' => $name
       ]);
+      $wpdb->update( $wpdb->posts, array( 'ID' => $templateId ), array( 'ID' => $template[0]['template_id'] ) );
+      $wpdb->update( $wpdb->postmeta, array( 'post_id' => $templateId ), array( 'post_id' => $template[0]['template_id'] ) );
+      $wpdb->update( $wpdb->term_relationships, array( 'object_id' => $templateId ), array( 'object_id' => $template[0]['template_id'] ) );
     }
 }
 
